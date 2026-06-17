@@ -1,6 +1,8 @@
 import os
 import logging
 import random
+import threading
+from flask import Flask
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
@@ -457,14 +459,36 @@ async def send_case2_round(query, state, round_idx):
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
 
-def main():
+import asyncio
+
+def run_bot():
     if not BOT_TOKEN:
         raise RuntimeError("BOT_TOKEN environment variable is not set")
+    # Background threads don't have an event loop by default — create one.
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
     logger.info("Bot starting...")
-    app.run_polling()
+    app.run_polling(close_loop=False, stop_signals=None)
+
+
+# ─── MINIMAL WEB SERVER (so Render Web Service stays happy) ──────────────
+flask_app = Flask(__name__)
+
+@flask_app.route("/")
+def health():
+    return "popCrimLAB bot is running!"
+
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    flask_app.run(host="0.0.0.0", port=port)
+
 
 if __name__ == "__main__":
-    main()
+    # Run the Telegram bot in a background thread,
+    # and the tiny Flask server in the main thread (Render needs an open port).
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
+    bot_thread.start()
+    run_flask()
