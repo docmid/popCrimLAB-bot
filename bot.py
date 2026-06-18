@@ -248,6 +248,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── QUIZ MODE ──
     if data == "menu_quiz":
+        state["quiz_queue"] = random.sample(QUIZ, len(QUIZ))
         state["quiz_idx"] = 0
         state["quiz_score"] = 0
         await send_quiz(query, state)
@@ -255,18 +256,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data.startswith("quiz_answer_"):
         idx = int(data.replace("quiz_answer_", ""))
-        q = QUIZ[state["quiz_idx"]]
+        q = state["quiz_queue"][state["quiz_idx"]]
         is_correct = idx == q["correct"]
         if is_correct:
             state["quiz_score"] += 1
         result = "✅ Верно!" if is_correct else f"❌ Неверно. Правильный ответ: {q['options'][q['correct']]}"
         text = f"{q['q']}\n\n{result}\n\n{q['explanation']}"
         state["quiz_idx"] += 1
-        if state["quiz_idx"] < len(QUIZ):
+        if state["quiz_idx"] < len(state["quiz_queue"]):
             keyboard = [[InlineKeyboardButton("Следующий →", callback_data="quiz_next")],
                         [InlineKeyboardButton("← В меню", callback_data="menu_main")]]
         else:
-            text += f"\n\n🏁 Результат: {state['quiz_score']} / {len(QUIZ)}"
+            text += f"\n\n🏁 Результат: {state['quiz_score']} / {len(state['quiz_queue'])}"
             keyboard = [[InlineKeyboardButton("← В меню", callback_data="menu_main")]]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
         return
@@ -426,9 +427,9 @@ async def send_myth(query, state):
 
 
 async def send_quiz(query, state):
-    q = QUIZ[state["quiz_idx"]]
+    q = state["quiz_queue"][state["quiz_idx"]]
     n = state["quiz_idx"] + 1
-    text = f"🧠 Вопрос {n} из {len(QUIZ)}\n\n{q['q']}"
+    text = f"🧠 Вопрос {n} из {len(state['quiz_queue'])}\n\n{q['q']}"
     keyboard = [[InlineKeyboardButton(opt, callback_data=f"quiz_answer_{i}")] for i, opt in enumerate(q["options"])]
     keyboard.append([InlineKeyboardButton("← В меню", callback_data="menu_main")])
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
